@@ -25,17 +25,17 @@ def convert_data_to_ids(tokenizer, target, text, label, config):
 
 
 # BERT/BERTweet tokenizer    
-def data_helper_bert(x_train_all,x_val_all,x_test_all,x_test_kg_all,model_select,config):
-    
+def data_helper_bert(x_train_all, x_val_all, x_test_all, x_test_kg_all, model_select, config):
     print('Loading data')
     
-    x_train,y_train,x_train_target = x_train_all[0],x_train_all[1],x_train_all[2]
-    x_val,y_val,x_val_target = x_val_all[0],x_val_all[1],x_val_all[2]
-    x_test,y_test,x_test_target = x_test_all[0],x_test_all[1],x_test_all[2]
-    x_test_kg,y_test_kg,x_test_target_kg = x_test_kg_all[0],x_test_kg_all[1],x_test_kg_all[2]
+    x_train, y_train, x_train_target = x_train_all[0], x_train_all[1], x_train_all[2]
+    x_val, y_val, x_val_target = x_val_all[0], x_val_all[1], x_val_all[2]
+    x_test, y_test, x_test_target = x_test_all[0], x_test_all[1], x_test_all[2]
+    x_test_kg, y_test_kg, x_test_target_kg = x_test_kg_all[0], x_test_kg_all[1], x_test_kg_all[2]
+    
     print("Length of original x_train: %d"%(len(x_train)))
-    print("Length of original x_val: %d, the sum is: %d"%(len(x_val), sum(y_val)))
-    print("Length of original x_test: %d, the sum is: %d"%(len(x_test), sum(y_test)))
+    print("Length of original x_val: %d"%(len(x_val)))
+    print("Length of original x_test: %d"%(len(x_test)))
     
     # get the tokenizer
     if model_select == 'Bertweet':
@@ -45,17 +45,39 @@ def data_helper_bert(x_train_all,x_val_all,x_test_all,x_test_kg_all,model_select
     elif model_select == 'Bert':
         tokenizer = BertTokenizer.from_pretrained("bert-base-uncased", do_lower_case=True)
 
-    # tokenization
+    # Create empty tensors for empty datasets
+    empty_loader = DataLoader(TensorDataset(
+        torch.tensor([], dtype=torch.long),
+        torch.tensor([], dtype=torch.long),
+        torch.tensor([], dtype=torch.long)
+    ), batch_size=int(config['batch_size']))
+    empty_labels = torch.tensor([], dtype=torch.long)
+
+    # tokenization and loader creation
     train_encoded_dict = convert_data_to_ids(tokenizer, x_train_target, x_train, y_train, config)
-    val_encoded_dict = convert_data_to_ids(tokenizer, x_val_target, x_val, y_val, config)
-    test_encoded_dict = convert_data_to_ids(tokenizer, x_test_target, x_test, y_test, config)
-    test_kg_encoded_dict = convert_data_to_ids(tokenizer, x_test_target_kg, x_test_kg, y_test_kg, config)
-    
     trainloader, y_train = data_loader(train_encoded_dict, int(config['batch_size']), model_select, 'train')
-    valloader, y_val = data_loader(val_encoded_dict, int(config['batch_size']), model_select, 'val')
-    testloader, y_test = data_loader(test_encoded_dict, int(config['batch_size']), model_select, 'test')
     trainloader2, y_train2 = data_loader(train_encoded_dict, int(config['batch_size']), model_select, 'train2')
-    kg_testloader, _ = data_loader(test_kg_encoded_dict, int(config['batch_size']), model_select, 'kg')
+
+    # Handle validation data
+    if len(x_val) > 0:
+        val_encoded_dict = convert_data_to_ids(tokenizer, x_val_target, x_val, y_val, config)
+        valloader, y_val = data_loader(val_encoded_dict, int(config['batch_size']), model_select, 'val')
+    else:
+        valloader, y_val = empty_loader, empty_labels
+
+    # Handle test data
+    if len(x_test) > 0:
+        test_encoded_dict = convert_data_to_ids(tokenizer, x_test_target, x_test, y_test, config)
+        testloader, y_test = data_loader(test_encoded_dict, int(config['batch_size']), model_select, 'test')
+    else:
+        testloader, y_test = empty_loader, empty_labels
+
+    # Handle KG test data
+    if len(x_test_kg) > 0:
+        test_kg_encoded_dict = convert_data_to_ids(tokenizer, x_test_target_kg, x_test_kg, y_test_kg, config)
+        kg_testloader, _ = data_loader(test_kg_encoded_dict, int(config['batch_size']), model_select, 'kg')
+    else:
+        kg_testloader, _ = empty_loader, empty_labels
     
     print("Length of final x_train: %d"%(len(y_train)))
     
